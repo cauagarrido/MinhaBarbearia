@@ -2,15 +2,17 @@ const prisma = require('../database/prisma');
 const AppError = require('../utils/AppError');
 
 const criarAgendamento = async (horarioId, clienteId) => {
-  // Usamos uma transação para garantir que as duas operações (update e create)
-  // aconteçam com sucesso, ou nenhuma delas acontece. Isso evita race conditions.
+  // Transação para garantir que a atualização e criação sejam atômicas
   const agendamento = await prisma.$transaction(async (tx) => {
     const horario = await tx.horario.findFirst({
-      where: { id: horarioId, status: 'disponivel' },
+      where: { id: horarioId },
     });
 
     if (!horario) {
-      throw new AppError('Horário não encontrado ou não está mais disponível.', 404);
+      throw new AppError('Horário não encontrado.', 404);
+    }
+    if (horario.status !== 'disponivel') {
+      throw new AppError('Este horário não está mais disponível.', 409);
     }
 
     await tx.horario.update({
@@ -20,8 +22,8 @@ const criarAgendamento = async (horarioId, clienteId) => {
 
     const novoAgendamento = await tx.agendamento.create({
       data: {
-        horarioId,
-        clienteId,
+        horarioId: horarioId,
+        clienteId: clienteId,
       },
     });
 
@@ -30,5 +32,61 @@ const criarAgendamento = async (horarioId, clienteId) => {
 
   return agendamento;
 };
-// ... outras funções (listar, cancelar)
-module.exports = { criarAgendamento };
+
+const listarMeusAgendamentos = async (clienteId) => {
+  const agendamentos = await prisma.agendamento.findMany({
+    where: {
+      clienteId,
+      status: 'confirmado',
+    },
+    include: {
+      horario: {
+        include: {
+          barbeiro: {
+            select: { nome: true },
+          },
+        },
+      },
+    },
+    orderBy: {
+      horario: {
+        data_hora_inicio: 'asc',
+      },
+    },
+  });
+  return agendamentos;
+};
+
+const cancelarAgendamento = async (agendamentoId, usuario) => {
+  return prisma.$transaction(async (tx) => {
+    const agendamento = await tx.agendamento.findUnique({
+      where: { id: agendamentoId },
+      include: { horario: true },
+    });
+
+    if (!agendamento) {
+      throw new AppError('Agendamento não encontrado.', 404);
+    }
+
+    // Checa permissão: ou é o cliente do agendamento, ou o barbeiro do horário
+    const isClienteDono = usuario.tipo === 'CLIENTE' && agendamento.clienteId === usuario.id;
+    const isBarbeiroDono = usuario.tipo === 'BARBEIRO' && agendamento.horario.barbeiroId === usuario.id;
+
+    if (!isClienteDono && !isBarbeiroDono) {
+      throw new AppError('Você não tem permissão para cancelar este agendamento.', 403);
+    }
+
+    // Libera o horário novamente
+    await tx.horario.update({
+      where: { id: agendamento.horarioId },
+      data: { status: 'disponivel' },
+    });
+
+    // Deleta o agendamento
+    await tx.agendamento.delete({
+      where: { id: agendamentoId },
+    });
+  });
+};
+
+module.exports = { criarAgendamento, listarMeusAgendamentos, cancelarAgendamento };

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const AppError = require('../utils/AppError');
+const config = require('../config');
 
 const proteger = (tiposPermitidos = []) => (req, res, next) => {
   let token;
@@ -12,11 +13,14 @@ const proteger = (tiposPermitidos = []) => (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = { id: decoded.id, tipo: decoded.tipo }; // Adiciona id e tipo do usuário na requisição
+    const decoded = jwt.verify(token, config.jwtSecret);
+    
+    // Anexa o usuário decodificado à requisição
+    req.user = { id: decoded.id, tipo: decoded.tipo };
 
+    // Se a rota exige um tipo de usuário específico, verifica a permissão
     if (tiposPermitidos.length > 0 && !tiposPermitidos.includes(decoded.tipo)) {
-        return next(new AppError('Você não tem permissão para realizar esta ação.', 403));
+      return next(new AppError('Você não tem permissão para realizar esta ação.', 403));
     }
 
     next();
