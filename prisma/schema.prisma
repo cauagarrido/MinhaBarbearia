@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserType {
+  CLIENTE
+  BARBEIRO
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  nome      String
+  senha     String
+  tipo      UserType
+  horarios  Horario[] // Relação: Um barbeiro pode ter muitos horários
+  agendamentos Agendamento[] // Relação: Um cliente pode ter muitos agendamentos
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Horario {
+  id        Int      @id @default(autoincrement())
+  data_hora_inicio DateTime
+  data_hora_fim   DateTime
+  status    String   @default("disponivel") // disponivel, agendado
+
+  barbeiroId  Int
+  barbeiro    User     @relation(fields: [barbeiroId], references: [id])
+  agendamento Agendamento? // Um horário pode ter um agendamento
+
+  createdAt DateTime @default(now())
+}
+
+model Agendamento {
+  id        Int      @id @default(autoincrement())
+  status    String   @default("confirmado") // confirmado, cancelado
+
+  clienteId Int
+  cliente   User     @relation(fields: [clienteId], references: [id])
+
+  horarioId Int      @unique // Cada horário só pode ter um agendamento
+  horario   Horario  @relation(fields: [horarioId], references: [id])
+  
+  createdAt DateTime @default(now())
+}
