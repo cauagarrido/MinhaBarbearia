@@ -1,5 +1,3 @@
-// Este arquivo centraliza o acesso às variáveis de ambiente
-// e pode ser expandido para outras configurações globais.
 
 require('dotenv').config();
 

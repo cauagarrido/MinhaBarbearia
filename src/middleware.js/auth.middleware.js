@@ -15,10 +15,10 @@ const proteger = (tiposPermitidos = []) => (req, res, next) => {
   try {
     const decoded = jwt.verify(token, config.jwtSecret);
     
-    // Anexa o usuário decodificado à requisição
+  
     req.user = { id: decoded.id, tipo: decoded.tipo };
 
-    // Se a rota exige um tipo de usuário específico, verifica a permissão
+    
     if (tiposPermitidos.length > 0 && !tiposPermitidos.includes(decoded.tipo)) {
       return next(new AppError('Você não tem permissão para realizar esta ação.', 403));
     }

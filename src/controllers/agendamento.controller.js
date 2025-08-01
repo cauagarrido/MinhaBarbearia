@@ -24,7 +24,7 @@ const listarMeus = async (req, res, next) => {
 const cancelar = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const usuario = req.user; // O objeto user contém id e tipo
+    const usuario = req.user; 
     await agendamentoService.cancelarAgendamento(Number(id), usuario);
     res.status(200).json({ mensagem: 'Agendamento cancelado com sucesso.' });
   } catch (error) {

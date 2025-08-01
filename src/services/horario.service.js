@@ -4,7 +4,7 @@ const AppError = require('../utils/AppError');
 const criarHorario = async (data, barbeiroId) => {
   const { data_hora_inicio, data_hora_fim } = data;
 
-  // Checa por conflitos de horário para este barbeiro
+  
   const conflito = await prisma.horario.findFirst({
     where: {
       barbeiroId: barbeiroId,
@@ -37,7 +37,7 @@ const listarDisponiveis = async () => {
     where: {
       status: 'disponivel',
       data_hora_inicio: {
-        gte: new Date(), // Mostra apenas horários futuros
+        gte: new Date(),
       },
     },
     include: {

@@ -38,7 +38,7 @@ const login = async (email, senha) => {
     { expiresIn: '1d' }
   );
 
-  const { senha: _, ...usuarioLogado } = user; // Remove a senha do objeto de retorno
+  const { senha: _, ...usuarioLogado } = user;
 
   return { usuario: usuarioLogado, token };
 };

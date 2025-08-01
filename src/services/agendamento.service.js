@@ -2,7 +2,7 @@ const prisma = require('../database/prisma');
 const AppError = require('../utils/AppError');
 
 const criarAgendamento = async (horarioId, clienteId) => {
-  // Transação para garantir que a atualização e criação sejam atômicas
+ 
   const agendamento = await prisma.$transaction(async (tx) => {
     const horario = await tx.horario.findFirst({
       where: { id: horarioId },
@@ -68,7 +68,7 @@ const cancelarAgendamento = async (agendamentoId, usuario) => {
       throw new AppError('Agendamento não encontrado.', 404);
     }
 
-    // Checa permissão: ou é o cliente do agendamento, ou o barbeiro do horário
+
     const isClienteDono = usuario.tipo === 'CLIENTE' && agendamento.clienteId === usuario.id;
     const isBarbeiroDono = usuario.tipo === 'BARBEIRO' && agendamento.horario.barbeiroId === usuario.id;
 
@@ -76,13 +76,12 @@ const cancelarAgendamento = async (agendamentoId, usuario) => {
       throw new AppError('Você não tem permissão para cancelar este agendamento.', 403);
     }
 
-    // Libera o horário novamente
+   
     await tx.horario.update({
       where: { id: agendamento.horarioId },
       data: { status: 'disponivel' },
     });
 
-    // Deleta o agendamento
     await tx.agendamento.delete({
       where: { id: agendamentoId },
     });
