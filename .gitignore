@@ -1,5 +1,13 @@
+# Ficheiros de Dependências
 node_modules
 
+# Ficheiros de Ambiente (contêm segredos)
 .env
 
-/generated/prisma
+# Ficheiro do Banco de Dados Local
+database.db
+database.db-journal
+
+# Logs e Ficheiros do Sistema Operacional
+npm-debug.log
+.DS_Store
