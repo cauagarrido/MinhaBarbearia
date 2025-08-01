@@ -1,61 +1,78 @@
-const prisma = require('../database/prisma');
+const { connect } = require('../database/sqlite');
 const AppError = require('../utils/AppError');
 
+/**
+ * Cria um novo horário de disponibilidade para um barbeiro.
+ * @param {object} data - Contém data_hora_inicio e data_hora_fim.
+ * @param {number} barbeiroId - O ID do barbeiro autenticado.
+ * @returns {Promise<object>} O novo horário criado.
+ */
 const criarHorario = async (data, barbeiroId) => {
+  const db = await connect();
   const { data_hora_inicio, data_hora_fim } = data;
 
-  
-  const conflito = await prisma.horario.findFirst({
-    where: {
-      barbeiroId: barbeiroId,
-      OR: [
-        {
-          data_hora_inicio: { lt: data_hora_fim },
-          data_hora_fim: { gt: data_hora_inicio },
-        },
-      ],
-    },
-  });
+  // --- CORREÇÃO 1: Validar os dados de entrada ---
+  // Garante que a data de início seja anterior à data de fim.
+  if (!data_hora_inicio || !data_hora_fim || new Date(data_hora_inicio) >= new Date(data_hora_fim)) {
+    throw new AppError('A data de início deve ser anterior à data de fim e ambas devem ser fornecidas.', 400);
+  }
+
+  // --- CORREÇÃO 2: Lógica de conflito mais robusta ---
+  // Esta query verifica se o novo horário (StartN, EndN) se sobrepõe a qualquer
+  // horário existente (StartE, EndE) usando a lógica: StartE < EndN AND EndE > StartN
+  const conflito = await db.get(
+    `SELECT id FROM Horario WHERE barbeiroId = ? AND data_hora_inicio < ? AND data_hora_fim > ?`,
+    [barbeiroId, data_hora_fim, data_hora_inicio]
+  );
 
   if (conflito) {
     throw new AppError('O horário solicitado entra em conflito com um horário já existente.', 409);
   }
 
-  const novoHorario = await prisma.horario.create({
-    data: {
-      data_hora_inicio,
-      data_hora_fim,
-      barbeiroId,
-    },
-  });
+  const result = await db.run(
+    'INSERT INTO Horario (data_hora_inicio, data_hora_fim, barbeiroId) VALUES (?, ?, ?)',
+    [data_hora_inicio, data_hora_fim, barbeiroId]
+  );
 
-  return novoHorario;
+  return {
+    id: result.lastID,
+    data_hora_inicio,
+    data_hora_fim,
+    barbeiroId,
+    status: 'disponivel',
+  };
 };
 
+/**
+ * Lista todos os horários futuros que estão com status 'disponivel'.
+ * @returns {Promise<Array<object>>} Uma lista de horários disponíveis.
+ */
 const listarDisponiveis = async () => {
-  const horarios = await prisma.horario.findMany({
-    where: {
-      status: 'disponivel',
-      data_hora_inicio: {
-        gte: new Date(),
-      },
-    },
-    include: {
-      barbeiro: {
-        select: { id: true, nome: true },
-      },
-    },
-    orderBy: {
-      data_hora_inicio: 'asc',
-    },
-  });
+  const db = await connect();
+  const horarios = await db.all(`
+    SELECT 
+      h.id,
+      h.data_hora_inicio,
+      h.data_hora_fim,
+      h.status,
+      u.id as barbeiroId,
+      u.nome as barbeiroNome
+    FROM Horario h
+    JOIN User u ON h.barbeiroId = u.id
+    WHERE h.status = 'disponivel' AND h.data_hora_inicio >= datetime('now','localtime')
+    ORDER BY h.data_hora_inicio ASC
+  `);
   return horarios;
 };
 
+/**
+ * Deleta um horário, desde que não esteja agendado.
+ * @param {number} horarioId - O ID do horário a ser deletado.
+ * @param {number} barbeiroId - O ID do barbeiro autenticado (para verificação de permissão).
+ */
 const deletarHorario = async (horarioId, barbeiroId) => {
-  const horario = await prisma.horario.findUnique({
-    where: { id: horarioId },
-  });
+  const db = await connect();
+  const horario = await db.get('SELECT * FROM Horario WHERE id = ?', [horarioId]);
 
   if (!horario) {
     throw new AppError('Horário não encontrado.', 404);
@@ -69,9 +86,7 @@ const deletarHorario = async (horarioId, barbeiroId) => {
     throw new AppError('Não é possível deletar um horário que já foi agendado.', 409);
   }
 
-  await prisma.horario.delete({
-    where: { id: horarioId },
-  });
+  await db.run('DELETE FROM Horario WHERE id = ?', [horarioId]);
 };
 
 module.exports = { criarHorario, listarDisponiveis, deletarHorario };
