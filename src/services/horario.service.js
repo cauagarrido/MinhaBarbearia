@@ -1,25 +1,20 @@
-const { connect } = require('../database/sqlite');
+const { connect } = require('../database/connection');
 const AppError = require('../utils/AppError');
 
 /**
- * Cria um novo horário de disponibilidade para um barbeiro.
- * @param {object} data - Contém data_hora_inicio e data_hora_fim.
- * @param {number} barbeiroId - O ID do barbeiro autenticado.
- * @returns {Promise<object>} O novo horário criado.
+ * 
+ * @param {object} data - 
+ * @param {number} barbeiroId - 
+ * @returns {Promise<object>} 
  */
 const criarHorario = async (data, barbeiroId) => {
   const db = await connect();
   const { data_hora_inicio, data_hora_fim } = data;
 
-  // --- CORREÇÃO 1: Validar os dados de entrada ---
-  // Garante que a data de início seja anterior à data de fim.
   if (!data_hora_inicio || !data_hora_fim || new Date(data_hora_inicio) >= new Date(data_hora_fim)) {
     throw new AppError('A data de início deve ser anterior à data de fim e ambas devem ser fornecidas.', 400);
   }
 
-  // --- CORREÇÃO 2: Lógica de conflito mais robusta ---
-  // Esta query verifica se o novo horário (StartN, EndN) se sobrepõe a qualquer
-  // horário existente (StartE, EndE) usando a lógica: StartE < EndN AND EndE > StartN
   const conflito = await db.get(
     `SELECT id FROM Horario WHERE barbeiroId = ? AND data_hora_inicio < ? AND data_hora_fim > ?`,
     [barbeiroId, data_hora_fim, data_hora_inicio]
@@ -44,19 +39,15 @@ const criarHorario = async (data, barbeiroId) => {
 };
 
 /**
- * Lista todos os horários futuros que estão com status 'disponivel'.
- * @returns {Promise<Array<object>>} Uma lista de horários disponíveis.
+ * 
+ * @returns {Promise<Array<object>>} 
  */
 const listarDisponiveis = async () => {
   const db = await connect();
   const horarios = await db.all(`
     SELECT 
-      h.id,
-      h.data_hora_inicio,
-      h.data_hora_fim,
-      h.status,
-      u.id as barbeiroId,
-      u.nome as barbeiroNome
+      h.id, h.data_hora_inicio, h.data_hora_fim, h.status,
+      u.id as barbeiroId, u.nome as barbeiroNome
     FROM Horario h
     JOIN User u ON h.barbeiroId = u.id
     WHERE h.status = 'disponivel' AND h.data_hora_inicio >= datetime('now','localtime')
@@ -66,9 +57,9 @@ const listarDisponiveis = async () => {
 };
 
 /**
- * Deleta um horário, desde que não esteja agendado.
- * @param {number} horarioId - O ID do horário a ser deletado.
- * @param {number} barbeiroId - O ID do barbeiro autenticado (para verificação de permissão).
+ * 
+ * @param {number} horarioId 
+ * @param {number} barbeiroId 
  */
 const deletarHorario = async (horarioId, barbeiroId) => {
   const db = await connect();
@@ -77,11 +68,9 @@ const deletarHorario = async (horarioId, barbeiroId) => {
   if (!horario) {
     throw new AppError('Horário não encontrado.', 404);
   }
-
   if (horario.barbeiroId !== barbeiroId) {
     throw new AppError('Você não tem permissão para deletar este horário.', 403);
   }
-
   if (horario.status === 'agendado') {
     throw new AppError('Não é possível deletar um horário que já foi agendado.', 409);
   }

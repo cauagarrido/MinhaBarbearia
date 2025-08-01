@@ -1,64 +1,63 @@
-
 const authService = require('./auth.service');
-
-const { connect } = require('../database/sqlite');
-
+const { connect } = require('../database/connection'); 
 const AppError = require('../utils/AppError');
 
 
-jest.mock('../database/sqlite');
+jest.mock('../database/connection');
 
 describe('Auth Service (Unit Tests)', () => {
   let mockDb;
 
-  
   beforeEach(() => {
     mockDb = {
-      get: jest.fn(), 
-      run: jest.fn(), 
+      get: jest.fn(),
+      run: jest.fn(),
     };
-    
     connect.mockResolvedValue(mockDb);
   });
 
- 
   afterEach(() => {
     jest.clearAllMocks();
   });
 
   it('deve registrar um novo cliente com sucesso', async () => {
-   
-    const nome = 'Teste';
-    const email = 'teste@email.com';
-    const senha = '123';
+    const dadosCliente = {
+      nome: 'Cliente Teste',
+      email: 'teste@email.com',
+      senha: '123',
+    };
 
-   
-    mockDb.get.mockResolvedValue(null); 
-    mockDb.run.mockResolvedValue({ lastID: 1 }); 
+    mockDb.get.mockResolvedValue(null);
+    mockDb.run.mockResolvedValue({ lastID: 1 });
 
-  
-    const result = await authService.registrarCliente(nome, email, senha);
+    const novoCliente = await authService.registrarCliente(
+      dadosCliente.nome,
+      dadosCliente.email,
+      dadosCliente.senha
+    );
 
-    
-    expect(result.id).toBe(1);
-    expect(result.email).toBe(email);
-    expect(mockDb.get).toHaveBeenCalledWith('SELECT * FROM User WHERE email = ?', [email]);
+    expect(novoCliente).toBeDefined();
+    expect(novoCliente.id).toBe(1);
+    expect(novoCliente.email).toBe(dadosCliente.email);
+    expect(mockDb.get).toHaveBeenCalledWith('SELECT * FROM User WHERE email = ?', [dadosCliente.email]);
   });
 
   it('deve lançar um erro se o e-mail já estiver em uso', async () => {
+    const dadosCliente = {
+      nome: 'Cliente Teste',
+      email: 'existente@email.com',
+      senha: '123',
+    };
     
-    const nome = 'Teste';
-    const email = 'existente@email.com';
-    const senha = '123';
+    mockDb.get.mockResolvedValue({
+      id: 2,
+      email: 'existente@email.com',
+      nome: 'Outro Cliente',
+    });
 
-   
-    mockDb.get.mockResolvedValue({ id: 1, email: 'existente@email.com' });
-
-   
     await expect(
-      authService.registrarCliente(nome, email, senha)
+      authService.registrarCliente(dadosCliente.nome, dadosCliente.email, dadosCliente.senha)
     ).rejects.toThrow(new AppError('Este e-mail já está em uso.', 409));
-
     
     expect(mockDb.run).not.toHaveBeenCalled();
   });
