@@ -10,42 +10,42 @@ const AppError = require('../utils/AppError');
 const criarAgendamento = async (horarioId, clienteId) => {
   const db = await connect();
   try {
-    // Inicia a transação para garantir a consistência dos dados
+   
     await db.exec('BEGIN TRANSACTION');
 
-    // 1. Busca o horário e verifica se está disponível
+    
     const horario = await db.get(
       "SELECT * FROM Horario WHERE id = ? AND status = 'disponivel'",
       [horarioId]
     );
 
     if (!horario) {
-      // Se não encontrou, desfaz a transação e lança o erro
+      
       await db.exec('ROLLBACK');
       throw new AppError('Horário não encontrado ou não está mais disponível.', 404);
     }
 
-    // 2. Atualiza o status do horário para 'agendado'
+    
     await db.run(
       "UPDATE Horario SET status = 'agendado' WHERE id = ?",
       [horarioId]
     );
 
-    // 3. Cria o registro do agendamento
+ 
     const result = await db.run(
       'INSERT INTO Agendamento (horarioId, clienteId) VALUES (?, ?)',
       [horarioId, clienteId]
     );
 
-    // Se todas as operações foram bem-sucedidas, "comita" as alterações
+    
     await db.exec('COMMIT');
 
     return { id: result.lastID, horarioId, clienteId, status: 'confirmado' };
 
   } catch (error) {
-    // Se qualquer passo falhou, garante que a transação seja desfeita
+    
     await db.exec('ROLLBACK');
-    // Re-lança o erro para o controlador lidar com a resposta HTTP
+    
     if (error instanceof AppError) {
         throw error;
     }
@@ -98,7 +98,7 @@ const cancelarAgendamento = async (agendamentoId, usuario) => {
             throw new AppError('Agendamento não encontrado.', 404);
         }
 
-        // Checa permissão: ou é o cliente do agendamento, ou o barbeiro do horário
+        
         const isClienteDono = usuario.tipo === 'CLIENTE' && agendamento.clienteId === usuario.id;
         const isBarbeiroDono = usuario.tipo === 'BARBEIRO' && agendamento.barbeiroId === usuario.id;
 
@@ -107,13 +107,13 @@ const cancelarAgendamento = async (agendamentoId, usuario) => {
             throw new AppError('Você não tem permissão para cancelar este agendamento.', 403);
         }
 
-        // Libera o horário novamente
+       
         await db.run(
             "UPDATE Horario SET status = 'disponivel' WHERE id = ?",
             [agendamento.horarioId]
         );
 
-        // Deleta o agendamento
+        
         await db.run('DELETE FROM Agendamento WHERE id = ?', [agendamentoId]);
 
         await db.exec('COMMIT');
